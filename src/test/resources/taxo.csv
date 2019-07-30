@@ -1,0 +1,32 @@
+root;news
+news;esteri
+news;cronache
+root;societa
+news;economia
+societa;ambiente
+societa;persone
+societa;salute
+societa;mondo solidale
+root;sport
+root;cultura
+cultura;arte
+cultura;fotografia
+cultura;scuola
+root;spettacoli
+spettacoli;cinema
+spettacoli;musica
+root;donna
+donna;casa
+donna;mamme
+sport;calcio
+sport;ciclismo
+sport;formula uno
+sport;golf
+root;cucina
+root;viaggi
+root;costume
+costume;moda
+costume;giochi
+root;scienza e tecnologia
+scienza e tecnologia;scienze
+scienza e tecnologia;tecnologia
