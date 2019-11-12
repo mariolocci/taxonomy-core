@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Queue;
 import java.util.Set;
 
+import org.neo4j.graphdb.Direction;
 import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.Relationship;
@@ -23,12 +24,19 @@ import com.crs4.sem.neo4j.model.CategoryNode;
 import com.crs4.sem.neo4j.model.MyLabels;
 import com.crs4.sem.neo4j.model.RRelationShipType;
 
+
 import lombok.Data;
 
 @Data
 public class TaxonomyService extends NodeService {
 
-	// private NodeService nodeService;
+	
+	public static TaxonomyService instance;
+	public static TaxonomyService newInstance(File neo4jdirectory) {
+		if(instance==null)
+			instance=new TaxonomyService(neo4jdirectory);
+		return instance;
+	}
 
 	public TaxonomyService(File neo4jdirectory) {
 		super(neo4jdirectory);
@@ -72,6 +80,10 @@ public class TaxonomyService extends NodeService {
 		return this.getLinkedNodes(category, RRelationShipType.HAS_KEYWORD);
 
 	}
+	public List<Node> getDocuments(Node category) {
+		return this.getLinkedNodes(category, RRelationShipType.HAS_DOCUMENT);
+
+	}
 
 	public Node searchCategory(String category_name) {
 		return this.searchNode(MyLabels.CATEGORY.toString(), "name", category_name);
@@ -98,6 +110,24 @@ public class TaxonomyService extends NodeService {
 
 	}
 
+	public boolean isLeaf(Node node) {
+		int i=0;
+		try (Transaction tx = this.getGraphDb().beginTx()) {
+		Iterable<Relationship> aux = node.getRelationships(Direction.OUTGOING, RRelationShipType.IS_PARENT_OF);
+		
+		for(Relationship rel:aux) i++;
+		tx.success();
+		}
+		if(i==0) return true;
+		else return false;
+	
+		
+	}
+	
+	public boolean isLeaf(String category_id) {
+		Node node = this.searchCategory(category_id);
+		return isLeaf(node);
+	}
 	public String[] branchLabels(Node child) {
 
 		List<Node> nodes = this.visita(child, RRelationShipType.IS_PARENT_OF, false);
@@ -159,9 +189,39 @@ public class TaxonomyService extends NodeService {
 		this.addKeyword(category_node, keyword_node);
 
 	}
+	
+	
+	public void addDocument(String category, String document_id, boolean exclusive) throws CategoryNotFoundException {
+		Node category_node = null;
+		Node document_node = null;
+		category_node = this.searchCategory(category);
+		if (category_node == null) {
+			throw new CategoryNotFoundException();
+		}
+		document_node = this.searchDocument(document_id);
+		if (document_node == null) {
+			document_node = this.createDocument(document_id);
+		}
+		
+		if(exclusive)
+			this.deleteRelation(category_node,document_node);
+		if(!hasDocument(category_node,document_node))
+		   this.addDocument(category_node, document_node);
+		
+
+	}
+
+	
+
+	public  boolean hasDocument(Node category_node, Node document_node) {
+		return this.hasRelation(category_node,document_node);
+	}
 
 	public Node searchKeyword(String keyword) {
-		return this.searchNode(MyLabels.KEYWORD.toString(), "name", keyword);
+		return this.searchNode(MyLabels.KEYWORD.toString(), "keyword_id", keyword);
+	}
+	public Node searchDocument(String document_id) {
+		return this.searchNode(MyLabels.DOCUMENT.toString(), "document_id", document_id);
 	}
 
 	public void deleteTaxonomy(String name) throws TaxonomyNotFoundException {
@@ -176,7 +236,7 @@ public class TaxonomyService extends NodeService {
 
 	}
 
-	private void deleteCategory(Node node) {
+	public void deleteCategory(Node node) {
 		try (Transaction tx = this.getGraphDb().beginTx()) {
 			IndexManager indexManager = this.getGraphDb().index();
 			Index<Node> catindex = indexManager.forNodes(MyLabels.CATEGORY.toString());
@@ -191,7 +251,37 @@ public class TaxonomyService extends NodeService {
 			tx.success();
 		}
 	}
+	
+	public void deleteDocument(Node node) {
+		try (Transaction tx = this.getGraphDb().beginTx()) {
+			IndexManager indexManager = this.getGraphDb().index();
+			Index<Node> catindex = indexManager.forNodes(MyLabels.DOCUMENT.toString());
+			catindex.remove(node);
 
+			Iterable<Relationship> relations = node.getRelationships();
+			for (Relationship each : relations) {
+				each.delete();
+			}
+			node.delete();
+
+			tx.success();
+		}
+	}
+	
+	private void deleteRelations(Node node) {
+		try (Transaction tx = this.getGraphDb().beginTx()) {
+			
+		
+
+			Iterable<Relationship> relations = node.getRelationships();
+			for (Relationship each : relations) {
+				each.delete();
+			}
+			node.delete();
+
+			tx.success();
+		}
+	}
 	public void deleteKeywords(Node node_root) {
 		List<Node> nodes = this.visita(node_root, RRelationShipType.IS_PARENT_OF, true);
 		for (int i = 0; i < nodes.size(); i++) {
@@ -239,5 +329,71 @@ public class TaxonomyService extends NodeService {
 		// TODO Auto-generated method stub
 		return true;
 	}
+
+	
+
+	
+
+	public String[] getDocuments(String name, String id) throws CategoryNotFoundInTaxonomyException {
+		if (!this.categoryHasRoot(name, id))
+			throw new CategoryNotFoundInTaxonomyException();
+		Node category_node = this.searchCategory(id);
+		List<Node> documents_nodes = this.getDocuments(category_node);
+		if (documents_nodes.isEmpty())
+			return new String[0];
+		String[] result = new String[documents_nodes.size()];
+		for (int i = 0; i < documents_nodes.size(); i++) {
+			result[i] = this.getDocument(documents_nodes.get(i));
+		}
+		return result;
+	}
+
+	public void deleteDocument(String document_id) {
+		Node doc_node= this.searchDocument(document_id);
+		this.deleteDocument(doc_node);
+		
+	}
+
+	public Set<String> getAllDocuments(String name) throws TaxonomyNotFoundException, CategoryNotFoundInTaxonomyException {
+			Node root=this.searchCategory(name);
+			if(root==null) throw new com.crs4.sem.neo4j.exceptions.TaxonomyNotFoundException();
+		    String[] labels = this.branchLabels(root, true);
+		    Set<String> documents= new HashSet<String>();
+		    for( String label:labels) {
+		    	
+		        String[] klist = (this.getDocuments(name, label));
+		 
+		    	if(klist!=null&&klist.length>0) {
+		    		
+		    		documents.addAll( Arrays.asList(klist ));
+		    	}
+		    }
+			return documents;
+		}
+
+	public Node getParent(Node node) {
+		Set<Node> set= new HashSet<Node>();
+		Node parent=null;
+		try (Transaction tx = this.getGraphDb().beginTx()) {
+			
+			Iterable<Relationship> relations = node.getRelationships(RRelationShipType.IS_SON_OF);
+			for (Relationship each : relations) {
+				 parent=each.getEndNode();
+				set.add(parent);
+			}
+			
+			tx.success();
+		}
+		return parent;
+	}
+	
+	
+   public String getParent(String category_name) {
+	   Node child=this.searchCategory(category_name);
+	   Node parent=this.getParent(child);
+	   return this.getCategory(parent);
+   }
+	
+	
 
 }

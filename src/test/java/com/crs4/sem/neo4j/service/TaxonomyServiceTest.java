@@ -10,6 +10,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 
 import org.junit.Test;
 import org.neo4j.graphdb.Node;
@@ -106,6 +107,15 @@ public class TaxonomyServiceTest {
 		CategoryNode categoryNode=taxonomyService.getBranch("root", "root");
 		assertNotNull(categoryNode);
 	}
+
+@Test 
+public void getKeywords() throws FileNotFoundException, IOException, TaxonomyNotFoundException, CategoryNotFoundInTaxonomyException {
+	 TaxonomyService taxonomyService = buildTaxonomy();
+
+		Set<String> keywords = taxonomyService.getAllKeywords("root", true);
+		assertEquals(keywords.size(),900);
+		
+}
 
 }
 

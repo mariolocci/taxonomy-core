@@ -57,11 +57,45 @@ public class NodeService {
 		return node;
 	}
 
+	
 	public void addRelationShip(Node from, Node to, RRelationShipType relationship) {
 		try (Transaction tx = graphDb.beginTx()) {
 			from.createRelationshipTo(to, relationship);
 			tx.success();
 		}
+	}
+	public void deleteRelation(Node from, Node to) {
+		try (Transaction tx = graphDb.beginTx()) {
+			Relationship success=null;
+			Iterable<Relationship> iterator = from.getRelationships();
+			for(Relationship aux:iterator) {
+				Node node = aux.getEndNode();
+				if(node==to)
+					success=aux;
+			}
+			if(success!=null)
+				success.delete();
+				
+			tx.success();
+		}
+		
+	}
+	
+	public boolean hasRelation(Node from_node, Node to_node) {
+		try (Transaction tx = graphDb.beginTx()) {
+			Relationship success=null;
+			Iterable<Relationship> iterator =  from_node.getRelationships();
+			for(Relationship aux:iterator) {
+				Node node = aux.getEndNode();
+				if(node==to_node)
+					return true;
+			}
+			if(success!=null)
+				success.delete();
+				
+			tx.success();
+		}
+		return false;
 	}
 
 	public void delete(Node node) {
@@ -151,6 +185,15 @@ public class NodeService {
 		String label = null;
 		try (Transaction tx = graphDb.beginTx()) {
 			label = node.getProperty("keyword_id").toString();
+			tx.success();
+		}
+		return label;
+	}
+	
+	public String getDocument(Node node) {
+		String label = null;
+		try (Transaction tx = graphDb.beginTx()) {
+			label = node.getProperty("document_id").toString();
 			tx.success();
 		}
 		return label;
