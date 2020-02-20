@@ -393,6 +393,14 @@ public class TaxonomyService extends NodeService {
 	   Node parent=this.getParent(child);
 	   return this.getCategory(parent);
    }
+
+public void deleteDocument(String id, String document_id) {
+	Node doc_node= this.searchDocument(document_id);
+	Node cat_node=this.searchCategory(id);
+	this.deleteRelation(cat_node, doc_node);
+	
+	
+}
 	
 	
 
